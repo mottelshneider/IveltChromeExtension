@@ -20,6 +20,82 @@ function sendPost(post) {
 	}
 }
 
+function getHelperSettingsNode() {
+	return document.getElementById("iveltHelperSettings");
+}
+
+function isBbcodeFormatShortcutEnabled() {
+	const settingsNode = getHelperSettingsNode();
+	return settingsNode && settingsNode.getAttribute("data-bbcode-format-shortcuts") === "true";
+}
+
+function getMessageEditor(target) {
+	if (!target || target.nodeName !== "TEXTAREA") {
+		return null;
+	}
+
+	if (target.name === "message" || target.id === "message") {
+		return target;
+	}
+
+	return null;
+}
+
+function wrapSelectionWithTag(textarea, openTag, closeTag) {
+	const selectionStart = textarea.selectionStart;
+	const selectionEnd = textarea.selectionEnd;
+
+	if (typeof selectionStart !== "number" || typeof selectionEnd !== "number") {
+		return false;
+	}
+
+	const selectedText = textarea.value.slice(selectionStart, selectionEnd);
+	const replacement = openTag + selectedText + closeTag;
+	const scrollTop = textarea.scrollTop;
+
+	textarea.setRangeText(replacement, selectionStart, selectionEnd, "end");
+
+	if (selectedText) {
+		textarea.setSelectionRange(selectionStart + openTag.length, selectionStart + openTag.length + selectedText.length);
+	} else {
+		textarea.setSelectionRange(selectionStart + openTag.length, selectionStart + openTag.length);
+	}
+
+	textarea.scrollTop = scrollTop;
+	textarea.dispatchEvent(new Event("input", { bubbles: true }));
+	return true;
+}
+
+function handleBbcodeFormatShortcut(e) {
+	const textarea = getMessageEditor(e.target);
+	if (!textarea || !isBbcodeFormatShortcutEnabled()) {
+		return false;
+	}
+
+	if (e.altKey) {
+		return false;
+	}
+
+	const hasPrimaryModifier = e.ctrlKey || e.metaKey;
+	if (!hasPrimaryModifier || e.shiftKey) {
+		return false;
+	}
+
+	const key = e.key.toLowerCase();
+	const tagMap = {
+		b: ["[b]", "[/b]"],
+		i: ["[i]", "[/i]"],
+		u: ["[u]", "[/u]"]
+	};
+
+	if (!tagMap[key]) {
+		return false;
+	}
+
+	e.preventDefault();
+	return wrapSelectionWithTag(textarea, tagMap[key][0], tagMap[key][1]);
+}
+
 function previewPost() {
 	document.getElementsByName("preview")[0].click();
 }
@@ -46,6 +122,10 @@ function nextNotification() {
 function checkKey(e) {
     const post = document.getElementsByName("post")[0] || document.getElementsByName("submit")[0] || false;
     const isAltKey = e.altKey || e.getModifierState('AltGraph');
+
+	if (handleBbcodeFormatShortcut(e)) {
+		return;
+	}
 
     if (e.code === "KeyA" && isAltKey) {
 		window.location.href = 'https://www.ivelt.com/forum/search.php?search_id=active_topics';
